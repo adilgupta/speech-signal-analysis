@@ -5,7 +5,7 @@ import pandas as pd
 import glob
 import pdb
 import crepe
-import os
+import os, csv
 import matlab.engine
 from pesq_analysis import _sqrt, melcd
 eng = matlab.engine.start_matlab()
@@ -20,30 +20,64 @@ def get_name(a):
     name = name[:-1]
     return name
 
+def werate(word):
+	tot_count = 0
+	l=0
+	for j in range(len(word)):
+
+		if(word[j][0] == 'c'):
+			tot_count+=1
+		elif(word[j][0] == 's'):
+			tot_count+=1
+			l+=1
+		elif(word[j][0] == 'd'):
+			tot_count+=1
+			l+=1
+		elif(word[j][0]=='i'):
+			l+=1
+
+	return l/(0.0+tot_count)
+
 if __name__ == '__main__':
-    noisy_files = glob.glob('./Dataset_for_adil/noisy_files_test/SNR_10/mgm_28122016_1_cs_d1_1_*.wav')
+    noisy_files = glob.glob('./Dataset_for_adil/noisy_files_test/SNR_10/*.wav')
     df = pd.DataFrame(columns = ('noisy_file','noisy_f0_error','enhanced_f0_error','noisy_cep_dist','enhanced_cep_dist','voicing_clean','voicing_noisy','voicing_enhanced'))
+    df_2 = pd.DataFrame(columns = ('file', 'noisy_f0_error', 'enhanced_f0_error', 'noisy_cep_dist', 'enhanced_cep_dist', 'wer_e', 'wer_n'))
+    tmp = []
+    for file in noisy_files:
+        if 'babble' in file:
+            tmp.append(file)
+    noisy_files = tmp
+
     for nf in noisy_files:
+        noise_types = ['babble', 'cp', 'rain', 'wind']
+        for type in noise_types:
+            if type in nf :
+                if(type == 'cp'):
+                    noise_type = 'childrenPlaying'
+                else:
+                    noise_type = type
         cf = './Dataset_for_adil/test/' + get_name(nf.split('/')[-1].split('_')[:-2]) + ".wav"#'./Dataset_for_adil/test/' + nf.split('/')[-1].split('_')[:-1] + '.wav'
         ef = './Dataset_for_adil/test_out/SNR_' + str(snr) + '/' + nf.split('/')[-1][:-4] + '_enhanced.wav'
+        enhanced_wer_file =  './10dbresults/folder/'+ nf.split('/')[-1][:12] + noise_type + str(snr) + 'dbenhanced_' + get_name(nf.split('/')[-1].split('_')[2:6]) + '_csid.csv'
+        noisy_wer_file = './10dbresults/folder/'+ nf.split('/')[-1][:12] + noise_type + str(snr) + 'db_' + get_name(nf.split('/')[-1].split('_')[2:6]) + '_csid.csv'
 
         fs, clean = wavfile.read(cf)
         fs, noisy = wavfile.read(nf)
         fs, enhanced = wavfile.read(ef)
 
-        clean = clean.astype(np.float64) / np.iinfo(clean.dtype).max
-        noisy = noisy.astype(np.float64) / np.iinfo(noisy.dtype).max
+        #clean = clean.astype(np.float64) / np.iinfo(clean.dtype).max
+        #noisy = noisy.astype(np.float64) / np.iinfo(noisy.dtype).max
 
         time_clean, frequency_clean, confidence_clean, activation_clean = crepe.predict(clean, fs, viterbi=True)
         time_noisy, frequency_noisy, confidence_noisy, activation_noisy = crepe.predict(noisy, fs, viterbi=True)
         time_enhanced, frequency_enhanced, confidence_enhanced, activation_enhanced = crepe.predict(enhanced, fs, viterbi=True)
 
-        enhanced_f0_error = np.sum(np.square(frequency_enhanced*confidence_enhanced-frequency_clean*confidence_clean))
-        noisy_f0_error = np.sum(np.square(frequency_noisy*confidence_noisy-frequency_clean*confidence_clean))
+
+        enhanced_f0_error = np.sqrt(np.mean(np.square(frequency_enhanced[confidence_clean>0.5] - frequency_clean[confidence_clean>0.5])))
+        noisy_f0_error = np.sqrt(np.mean(np.square(frequency_noisy[confidence_clean>0.5] - frequency_clean[confidence_clean>0.5])))
 
         total_len = len(time_enhanced)
 
-        #df = df.append({'noisy_file':nf, 'noisy_f0_error':noisy_f0_error, 'enhanced_f0_error':enhanced_f0_error}, ignore_index = True)
 
         eng.workspace['clean'] = eng.audioread(cf)
         eng.workspace['noisy'] = eng.audioread(nf)
@@ -62,5 +96,23 @@ if __name__ == '__main__':
         voicing_enhanced = np.sum(confidence_enhanced[confidence_enhanced>0.5])/np.sum(confidence_enhanced[confidence_enhanced<0.5])
 
         df = df.append({'noisy_file':nf, 'noisy_f0_error':noisy_f0_error, 'enhanced_f0_error':enhanced_f0_error, 'noisy_cep_dist':inp_cep_, 'enhanced_cep_dist':out_cep_, 'voicing_clean':voicing_clean, 'voicing_noisy':voicing_noisy, 'voicing_enhanced':voicing_enhanced}, ignore_index = True)
-        print(df)
+        t = []
+
+        with open(enhanced_wer_file,'r') as f:
+            #print(wer_file)
+            f2=list(csv.reader(f,delimiter='\n'))
+            t=t+f2
+        en_wer = werate(f2)
+
+        t = []
+        with open(noisy_wer_file,'r') as f:
+            #print(wer_file)
+            f2=list(csv.reader(f,delimiter='\n'))
+            t=t+f2
+        n_wer = werate(f2)
+
+        df_2 = df_2.append({'noisy_file':nf, 'noisy_f0_error':noisy_f0_error, 'enhanced_f0_error':enhanced_f0_error, 'noisy_cep_dist':inp_cep_, 'enhanced_cep_dist':out_cep_, 'wer_e':en_wer, 'wer_n':n_wer}, ignore_index = True)
+
+        #print(np.corrcoef(np.array(df_2['enhanced_f0_error']), np.array(df_2['wer'])), np.corrcoef(np.array(df_2['enhanced_cep_dist']), np.array(df_2['wer'])))
+
         pdb.set_trace()

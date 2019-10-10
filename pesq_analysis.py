@@ -74,7 +74,7 @@ def melcd(X, Y, lengths=None):
 
 
 if __name__ == "__main__":
-    noisy_files = glob.glob('./Dataset_for_adil/noisy_files_test/SNR_' + str(snr)+ '/*.wav')
+    noisy_files = glob.glob('./atmpt_101019/test_dataset/SNR_' + str(snr)+ '/*.wav')
     #pdb.set_trace()
     noise_types = ['rain', 'babble', 'childrenPlaying', 'wind']
     inp_pesq = [0,0,0,0]
@@ -84,8 +84,8 @@ if __name__ == "__main__":
     #pdb.set_trace()
     for file in noisy_files:
         noisy_file = file
-        clean_file = './Dataset_for_adil/test' + '/' + get_name(file.split('/')[-1].split('_')[:-2]) + '.wav'
-        enhanced_file = './Dataset_for_adil/test_out/SNR_' + str(snr) + '/' + file.split('/')[-1][:-4] + '_enhanced.wav'
+        clean_file = './atmpt_101019/test' + '/' + get_name(file.split('/')[-1].split('_')[:-2]) + '.wav'
+        enhanced_file = './atmpt_101019/test_out/SNR_' + str(snr) + '/' + file.split('/')[-1][:-4] + '_enhanced.wav'
 
         fs, noisy = wavfile.read(noisy_file)
         fs, clean = wavfile.read(clean_file)
@@ -101,8 +101,8 @@ if __name__ == "__main__":
             print("what the hell")
             pdb.set_trace()
 
-        clean = clean.astype(np.float) / np.iinfo(clean.dtype).max
-        noisy = noisy.astype(np.float) / np.iinfo(noisy.dtype).max
+        #clean = clean.astype(np.float) / np.iinfo(clean.dtype).max
+        #noisy = noisy.astype(np.float) / np.iinfo(noisy.dtype).max
 
         eng.workspace['clean'] = eng.audioread(clean_file)
         eng.workspace['noisy'] = eng.audioread(noisy_file)
@@ -110,6 +110,7 @@ if __name__ == "__main__":
         eng.workspace['fs'] = 16000.0
 
         #pdb.set_trace()
+        print('here')
         mfcc_clean = eng.mfcc(eng.workspace['clean'], eng.workspace['fs'], 'Numcoeffs', 10.)#eng.mfcc(matlab.double(clean.tolist()), matlab.double(16000))#eng.mfcc(clean.tolist, 16000)#, numcep = 14)
         mfcc_noisy = eng.mfcc(eng.workspace['noisy'], eng.workspace['fs'], 'Numcoeffs', 10.)   # mfcc(noisy, 16000, numcep = 14)
         mfcc_enhanced = eng.mfcc(eng.workspace['enhanced'], eng.workspace['fs'], 'Numcoeffs', 10.)#mfcc(enhanced, 16000, numcep = 14)
